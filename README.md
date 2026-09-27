@@ -1,56 +1,41 @@
-# Redfish lab tools
+# lab-tools
 
-Two PowerShell scripts for looking after Dell and HPE servers through their management controllers (Redfish). Built for a VMware Cloud Foundation home lab, written up on [rstechhub.com](https://rstechhub.com).
+Scripts from the [rstechhub.com](https://rstechhub.com) home lab: a VMware Cloud Foundation lab on Dell and HPE servers, MikroTik networking, TrueNAS and Synology storage, and Veeam backups. Each script is written up in a blog post, linked below.
 
-| Script | What it does | Works with |
-|---|---|---|
-| `Get-ServerInventory.ps1` | Firmware and physical-disk inventory for every server, side by side. Flags any component whose version differs between servers. Read-only. | Dell iDRAC 9 (full), iDRAC 7/8 (firmware), HPE iLO 4 |
-| `Set-IdracCertificate.ps1` | Issues an iDRAC web certificate from an internal Microsoft CA: CSR on the iDRAC, signed with `certreq`, imported over Redfish. | Dell iDRAC 9 |
+All examples use placeholder names and addresses (`example.internal`, `192.0.2.x`, `192.168.10.x`). Adjust them to your environment.
+
+| Folder | Script | What it does | Blog post |
+|---|---|---|---|
+| `redfish/` | `Get-ServerInventory.ps1` | Firmware and physical-disk inventory across Dell iDRAC 9/7/8 and HPE iLO 4, flags version mismatches. Read-only. | [Firmware updates on a running VCF cluster](https://rstechhub.com/lab-maintenance-firmware-updates-vcf-cluster/) |
+| `redfish/` | `Set-IdracCertificate.ps1` | CA-signed iDRAC 9 web certificate: CSR on the iDRAC, signed with `certreq`, imported over Redfish. | [Core Infrastructure Part 4: a certificate authority](https://rstechhub.com/core-infrastructure-part-4-certificate-authority/) |
+| `dns/` | `Import-DnsRecords.ps1` | Bulk A + PTR records from a CSV, creates missing zones, never overwrites. `-WhatIf` supported. | [Core Infrastructure Part 1: DNS, AD and time](https://rstechhub.com/core-infrastructure-part-1-dns-ad-time/) |
+| `dns/` | `Test-DnsRecords.ps1` | Read-only check for duplicate IPs, A records without PTR, and stale PTRs. Run before a VCF deployment. | [Core Infrastructure Part 1: DNS, AD and time](https://rstechhub.com/core-infrastructure-part-1-dns-ad-time/) |
+| `windows/` | `Set-TemplateBaseline.ps1` | Baseline settings for a Windows Server VM before it becomes a vCenter template. | [Core Infrastructure Part 7: a Windows Server template](https://rstechhub.com/core-infrastructure-part-7-windows-server-template/) |
+| `windows/` | `New-VeeamAdminAccess.ps1` | AD group and named admin for Veeam, local admin on the backup server, so the domain Administrator is not used. | Backing Up the Lab with Veeam (coming soon) |
+| `linux/` | `switch-backup.sh` | Nightly MikroTik `/export` over read-only SSH, committed to Git only when something changed. | [Nightly MikroTik config backups to Gitea](https://rstechhub.com/nightly-mikrotik-config-backups-gitea/) |
+| `linux/` | `vault-backup.sh` | Nightly consistent backup of a Vaultwarden install to an NFS share, with retention. | |
 
 ## Requirements
 
-- Windows PowerShell 5.1 or PowerShell 7
-- Network access to the iDRAC / iLO interfaces (HTTPS)
-- An iDRAC / iLO account with administrator rights
-- For `Set-IdracCertificate.ps1`: a domain-joined machine that can reach your AD CS certificate authority, with enrolment rights on the template (default `WebServer`)
+- PowerShell scripts: Windows PowerShell 5.1 or PowerShell 7. `dns/` needs the DnsServer module (run on a DNS server or DC); `New-VeeamAdminAccess.ps1` needs the ActiveDirectory module and WinRM to the Veeam server.
+- Redfish scripts: HTTPS access to the iDRAC / iLO and an administrator account. `Set-IdracCertificate.ps1` also needs a domain-joined machine with enrolment rights on your AD CS template (default `WebServer`).
+- Shell scripts: bash, and the packages listed in each script's header.
 
-## Get-ServerInventory.ps1
-
-```powershell
-.\Get-ServerInventory.ps1 -Idrac idrac1.example.com, idrac2.example.com -Ilo ilo1.example.com
-```
-
-Prompts for the iDRAC login (one shared account) and the iLO login, then shows:
-
-- **Firmware**: one row per component (BIOS, iDRAC, NIC, storage controller, drives, ...), one column per server, and `MISMATCH` where they differ
-- **Physical disks**: slot, model, type, size, firmware and health for every drive
-
-Both tables are saved as timestamped CSVs in `.\Reports`. Run it before and after a firmware round: before to see what needs doing, after to prove every host landed on the same versions.
-
-Notes:
-- A controller in the middle of a firmware update does not answer (503 / 500). It is skipped with a warning; run again later.
-- iDRAC 7 does not publish its disks over Redfish. The script reports its firmware and says so.
-
-## Set-IdracCertificate.ps1
+## Redfish scripts
 
 ```powershell
-.\Set-IdracCertificate.ps1 -Name idrac-host01 -IP 192.0.2.11 -Domain example.com `
+.\redfish\Get-ServerInventory.ps1 -Idrac idrac1.example.com, idrac2.example.com -Ilo ilo1.example.com
+
+.\redfish\Set-IdracCertificate.ps1 -Name idrac-host01 -IP 192.0.2.11 -Domain example.com `
     -CA "ca01.example.com\Example-Root-CA" -SetDnsName -DnsServers 192.0.2.53
 ```
 
-1. (`-SetDnsName`) sets the iDRAC's own DNS name and domain. Without this, iDRAC 9 answers **400 Bad Request** when you browse to it by a name it does not recognise.
-2. The iDRAC generates the key and CSR. The private key never leaves the iDRAC.
-3. `certreq` submits the CSR to your CA.
-4. The certificate is imported over Redfish and the iDRAC restarts (2-10 minutes; the server itself keeps running).
+`Get-ServerInventory.ps1` saves firmware and disk tables as timestamped CSVs in `.\Reports`. A controller mid-update answers 503/500 and is skipped with a warning. iDRAC 7 does not publish disks over Redfish.
 
-Why not the web upload? On some iDRAC firmware the web page rejects valid certificates (`RAC0622`, `RAC0613`, `SYS426`, `RAC0615`). The Redfish route has worked every time.
+`Set-IdracCertificate.ps1` with `-SetDnsName` sets the iDRAC's own DNS name first; without it iDRAC 9 returns 400 Bad Request when browsed by a name it does not know. The private key never leaves the iDRAC. Why not the web upload? Some firmware rejects valid certificates there (`RAC0622`, `RAC0613`, `SYS426`, `RAC0615`); Redfish has worked every time.
 
-For several iDRACs with one password prompt, see the second example in the script header.
-
-## A note on certificates and security
-
-Both scripts skip validation of the controllers' own HTTPS certificates, because most start life with a self-signed one. Run them from a trusted management network. Once your controllers have CA-signed certificates, you can remove the trust-all block.
+Both skip validation of the controllers' own HTTPS certificates, since most start self-signed. Run them from a trusted management network.
 
 ## Disclaimer
 
-Provided as-is under the MIT licence. Test in a lab first. `Get-ServerInventory.ps1` is read-only; `Set-IdracCertificate.ps1` changes the iDRAC's certificate (and, with `-SetDnsName`, its DNS settings) and restarts the iDRAC.
+Provided as-is under the MIT licence. Test in a lab first. Read each script's header before running it: the read-only ones say so, the others change configuration.
