@@ -1,0 +1,14 @@
+# Script output and local data: never commit your own inventory, logs or secrets
+Reports/
+*.log
+*.tmp
+*.csv
+!dns/records-example.csv
+*.cer
+*.crt
+*.key
+*.csr
+*.pfx
+.vscode/
+.DS_Store
+Thumbs.db

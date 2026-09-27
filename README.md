@@ -1,40 +1,36 @@
 # lab-tools
 
-Scripts from the [rstechhub.com](https://rstechhub.com) home lab: a VMware Cloud Foundation lab on Dell and HPE servers, MikroTik networking, TrueNAS and Synology storage, and Veeam backups. Each script is written up in a blog post, linked below.
+[![lint](https://github.com/rstechhub/lab-tools/actions/workflows/lint.yml/badge.svg)](https://github.com/rstechhub/lab-tools/actions/workflows/lint.yml)
 
-All examples use placeholder names and addresses (`example.internal`, `192.0.2.x`, `192.168.10.x`). Adjust them to your environment.
+Scripts from the [rstechhub.com](https://rstechhub.com) home lab: a VMware Cloud Foundation lab on Dell and HPE servers, MikroTik networking, TrueNAS and Synology storage, and Veeam backups. Each script is written up in a blog post, linked below. Every folder has its own README with usage and the gotchas found along the way.
+
+All examples use placeholder names and addresses (`example.internal`, `192.0.2.x`, `192.168.x.x`). Adjust them to your environment.
 
 | Folder | Script | What it does | Blog post |
 |---|---|---|---|
-| `redfish/` | `Get-ServerInventory.ps1` | Firmware and physical-disk inventory across Dell iDRAC 9/7/8 and HPE iLO 4, flags version mismatches. Read-only. | [Firmware updates on a running VCF cluster](https://rstechhub.com/lab-maintenance-firmware-updates-vcf-cluster/) |
-| `redfish/` | `Set-IdracCertificate.ps1` | CA-signed iDRAC 9 web certificate: CSR on the iDRAC, signed with `certreq`, imported over Redfish. | [Core Infrastructure Part 4: a certificate authority](https://rstechhub.com/core-infrastructure-part-4-certificate-authority/) |
-| `dns/` | `Import-DnsRecords.ps1` | Bulk A + PTR records from a CSV, creates missing zones, never overwrites. `-WhatIf` supported. | [Core Infrastructure Part 3: domain controllers and DNS](https://rstechhub.com/core-infrastructure-part-3-domain-controllers/) |
-| `dns/` | `Test-DnsRecords.ps1` | Read-only check for duplicate IPs, A records without PTR, and stale PTRs. Run before a VCF deployment. | [Core Infrastructure Part 3: domain controllers and DNS](https://rstechhub.com/core-infrastructure-part-3-domain-controllers/) |
-| `windows/` | `Set-TemplateBaseline.ps1` | Baseline settings for a Windows Server VM before it becomes a vCenter template. | [Core Infrastructure Part 7: a Windows Server template](https://rstechhub.com/core-infrastructure-part-7-windows-server-template/) |
-| `windows/` | `New-VeeamAdminAccess.ps1` | AD group and named admin for Veeam, local admin on the backup server, so the domain Administrator is not used. | Backing Up the Lab with Veeam (coming soon) |
-| `linux/` | `switch-backup.sh` | Nightly MikroTik `/export` over read-only SSH, committed to Git only when something changed. | [Nightly MikroTik config backups to Gitea](https://rstechhub.com/nightly-mikrotik-config-backups-gitea/) |
-| `linux/` | `vault-backup.sh` | Nightly consistent backup of a Vaultwarden install to an NFS share, with retention. | |
+| [`redfish/`](redfish/) | `Get-ServerInventory.ps1` | Firmware and physical-disk inventory across Dell iDRAC 9/7/8 and HPE iLO 4, flags version mismatches. Read-only. | [Firmware updates on a running VCF cluster](https://rstechhub.com/lab-maintenance-firmware-updates-vcf-cluster/) |
+| [`redfish/`](redfish/) | `Set-IdracCertificate.ps1` | CA-signed iDRAC 9 web certificate: CSR on the iDRAC, signed with `certreq`, imported over Redfish. | [Core Infrastructure Part 4](https://rstechhub.com/core-infrastructure-part-4-certificate-authority/) |
+| [`dns/`](dns/) | `Import-DnsRecords.ps1` | Bulk A + PTR records from a CSV, creates missing zones, never overwrites. `-WhatIf` supported. | [Core Infrastructure Part 3](https://rstechhub.com/core-infrastructure-part-3-domain-controllers/) |
+| [`dns/`](dns/) | `Test-DnsRecords.ps1` | Read-only check for duplicate IPs, A records without PTR, and stale PTRs. Run before a VCF deployment. | [Core Infrastructure Part 3](https://rstechhub.com/core-infrastructure-part-3-domain-controllers/) |
+| [`windows/`](windows/) | `Set-TemplateBaseline.ps1` | Baseline settings for a Windows Server VM before it becomes a vCenter template. | [Core Infrastructure Part 7](https://rstechhub.com/core-infrastructure-part-7-windows-server-template/) |
+| [`windows/`](windows/) | `Set-KmsDnsRecord.ps1` | KMS host A + PTR and the `_vlmcs._tcp` SRV record, so clones activate on their own. | [Core Infrastructure Part 7](https://rstechhub.com/core-infrastructure-part-7-windows-server-template/) |
+| [`veeam/`](veeam/) | `New-VeeamAdminAccess.ps1` | AD group and named admin for Veeam, local admin on the backup server, so the domain Administrator is not used. | Backing Up the Lab with Veeam (coming soon) |
+| [`vmware/`](vmware/) | `Add-NfsDatastore.ps1` | Storage VMkernel adapter, jumbo-frame path check, NFS 4.1 datastore (PowerCLI). | [TrueNAS Part 5](https://rstechhub.com/truenas-scale-dell-r620-part-5-storage-vlan-dac-certificate/) |
+| [`truenas/`](truenas/) | `set-storage-vlan.sh` | Tagged storage VLAN with jumbo frames on TrueNAS SCALE, as the management and gateway network. | [TrueNAS Part 5](https://rstechhub.com/truenas-scale-dell-r620-part-5-storage-vlan-dac-certificate/) |
+| [`truenas/`](truenas/) | `create-nfs-shares.sh` | Datasets and NFS shares for vSphere, vCenter backups and Veeam, bound to the storage IP. | [TrueNAS Part 5](https://rstechhub.com/truenas-scale-dell-r620-part-5-storage-vlan-dac-certificate/) |
+| [`mikrotik/`](mikrotik/) | `*.rsc` | RouterOS 7: read-only backup user, break-glass admin, clear logs. | [MikroTik config backups](https://rstechhub.com/nightly-mikrotik-config-backups-gitea/) |
+| [`linux/`](linux/) | `switch-backup.sh` | Nightly MikroTik `/export` over read-only SSH, committed to Git only when something changed. | [MikroTik config backups](https://rstechhub.com/nightly-mikrotik-config-backups-gitea/) |
+| [`linux/`](linux/) | `vault-backup.sh` | Nightly consistent backup of a Vaultwarden install to an NFS share, with retention. | |
 
 ## Requirements
 
-- PowerShell scripts: Windows PowerShell 5.1 or PowerShell 7. `dns/` needs the DnsServer module (run on a DNS server or DC); `New-VeeamAdminAccess.ps1` needs the ActiveDirectory module and WinRM to the Veeam server.
-- Redfish scripts: HTTPS access to the iDRAC / iLO and an administrator account. `Set-IdracCertificate.ps1` also needs a domain-joined machine with enrolment rights on your AD CS template (default `WebServer`).
-- Shell scripts: bash, and the packages listed in each script's header.
+- PowerShell scripts: Windows PowerShell 5.1 or PowerShell 7. Modules needed are listed in each folder's README (DnsServer, ActiveDirectory, VMware PowerCLI).
+- Shell scripts: bash, and the packages listed in each script's header. TrueNAS scripts run on TrueNAS SCALE 25.x.
+- RouterOS snippets: RouterOS 7.
 
-## Redfish scripts
+## Checks
 
-```powershell
-.\redfish\Get-ServerInventory.ps1 -Idrac idrac1.example.com, idrac2.example.com -Ilo ilo1.example.com
-
-.\redfish\Set-IdracCertificate.ps1 -Name idrac-host01 -IP 192.0.2.11 -Domain example.com `
-    -CA "ca01.example.com\Example-Root-CA" -SetDnsName -DnsServers 192.0.2.53
-```
-
-`Get-ServerInventory.ps1` saves firmware and disk tables as timestamped CSVs in `.\Reports`. A controller mid-update answers 503/500 and is skipped with a warning. iDRAC 7 does not publish disks over Redfish.
-
-`Set-IdracCertificate.ps1` with `-SetDnsName` sets the iDRAC's own DNS name first; without it iDRAC 9 returns 400 Bad Request when browsed by a name it does not know. The private key never leaves the iDRAC. Why not the web upload? Some firmware rejects valid certificates there (`RAC0622`, `RAC0613`, `SYS426`, `RAC0615`); Redfish has worked every time.
-
-Both skip validation of the controllers' own HTTPS certificates, since most start self-signed. Run them from a trusted management network.
+Every push runs [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer) on the PowerShell scripts and [ShellCheck](https://www.shellcheck.net/) on the shell scripts. See [CHANGELOG.md](CHANGELOG.md) for what changed.
 
 ## Disclaimer
 
