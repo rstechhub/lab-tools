@@ -1,0 +1,7 @@
+Zone,Name,IP
+vcf.example.internal,sddcmanager,192.168.10.30
+vcf.example.internal,vcenter,192.168.10.31
+vcf.example.internal,nsxmgr,192.168.10.32
+vcf.example.internal,nsxmgr01,192.168.10.33
+vcf.example.internal,esx01,192.168.10.40
+vcf.example.internal,esx02,192.168.10.41
