@@ -60,7 +60,7 @@ public class TrustAllCerts : ICertificatePolicy {
 
 # Windows PowerShell only sends credentials after a challenge, which Redfish often never issues:
 # send Basic auth up front instead.
-function New-Hdr($cred) {
+function New-Hdr([pscredential]$cred) {
     $pair = "{0}:{1}" -f $cred.UserName, $cred.GetNetworkCredential().Password
     @{ Authorization = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair)) }
 }
@@ -115,7 +115,7 @@ foreach ($s in $servers) {
                             SizeGB=[math]::Round($dr.CapacityBytes / 1GB); Firmware=$dr.Revision; Health=$dr.Status.Health }
                     }
                 }
-            } catch { }
+            } catch { Write-Verbose "$s : Storage collection not available, trying legacy paths" }
             foreach ($legacy in '/redfish/v1/Systems/System.Embedded.1/Storage/Controllers', '/redfish/v1/Systems/System.Embedded.1/SimpleStorage/Controllers', '/redfish/v1/Systems/System.Embedded.1/SimpleStorage') {
                 if ($got) { break }
                 try {
@@ -128,7 +128,7 @@ foreach ($s in $servers) {
                                 SizeGB=$(if ($dv.CapacityBytes) { [math]::Round($dv.CapacityBytes / 1GB) }); Firmware=$dv.Revision; Health=$dv.Status.Health }
                         }
                     }
-                } catch { }
+                } catch { Write-Verbose "$s : $legacy not available" }
             }
             if (-not $got) { Write-Warning "$s : firmware read OK, but this iDRAC does not publish its disks over Redfish" }
         }
