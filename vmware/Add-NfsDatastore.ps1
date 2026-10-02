@@ -1,4 +1,4 @@
-# Gives an ESXi host a VMkernel adapter on the storage VLAN, mounts an NFS 4.1 datastore
+# Gives an ESXi host a VMkernel adapter on the storage VLAN, mounts an NFS datastore (NFS 3 by default)
 # over it, and proves the path with a jumbo-frame vmkping.
 # Without a storage vmk, NFS goes out of the management vmk to the default gateway and is
 # routed between VLANs, often on a switch CPU, and loses jumbo frames on the way.
@@ -18,7 +18,12 @@ param(
     [int]$Mtu = 9000,
     [Parameter(Mandatory)][string]$NfsServer,
     [Parameter(Mandatory)][string]$NfsPath,
-    [Parameter(Mandatory)][string]$DatastoreName
+    [Parameter(Mandatory)][string]$DatastoreName,
+    # NFS 3 by default. With ESXi 8.0 U3 against a TrueNAS SCALE (Linux knfsd) export, NFS 4.1 reported
+    # stale file sizes: a new thin VMDK showed 0 bytes on the host while the NAS had the full size, and
+    # the VM would not power on ("The file specified is not a virtual disk"). NFS 3 has not shown it.
+    # Do not mount the same export as NFS 3 and 4.1 at the same time: the locking is different.
+    [ValidateSet('3','4.1')][string]$NfsVersion = '3'
 )
 
 $h  = Get-VMHost -Name $VMHost -ErrorAction Stop
@@ -42,7 +47,7 @@ if ($vmk -and -not $WhatIfPreference) {
 
 if (Get-Datastore -VMHost $h -Name $DatastoreName -ErrorAction SilentlyContinue) {
     Write-Host "Datastore $DatastoreName already mounted"
-} elseif ($PSCmdlet.ShouldProcess("$($NfsServer):$NfsPath as $DatastoreName", 'Mount NFS 4.1')) {
-    New-Datastore -VMHost $h -Nfs -FileSystemVersion '4.1' -NfsHost $NfsServer -Path $NfsPath -Name $DatastoreName | Out-Null
+} elseif ($PSCmdlet.ShouldProcess("$($NfsServer):$NfsPath as $DatastoreName", "Mount NFS $NfsVersion")) {
+    New-Datastore -VMHost $h -Nfs -FileSystemVersion $NfsVersion -NfsHost $NfsServer -Path $NfsPath -Name $DatastoreName | Out-Null
     Write-Host "Mounted $DatastoreName"
 }
