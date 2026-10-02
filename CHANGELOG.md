@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2 (2 Oct 2026)
+
+- Added `veeam/Restart-VeeamServices.ps1`: stop, start, restart or list all Veeam services in a safe order (database first, main service last on stop), closes any open console, `-WhatIf` support.
+- `veeam/README.md` and the main README now link to the published Veeam posts.
+
 ## v1.1 (2 Oct 2026)
 
 - `vmware/Add-NfsDatastore.ps1`: new `-NfsVersion` parameter, default changed from NFS 4.1 to NFS 3. ESXi 8.0 U3 over NFS 4.1 to TrueNAS SCALE reported stale file sizes (new thin VMDKs at 0 bytes), so VMs would not power on.
