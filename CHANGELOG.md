@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3 (3 Oct 2026)
+
+- Added `linux/prepare-ubuntu-template.sh`: seals an Ubuntu 24.04 VM before converting it to a vSphere template (NTP servers as arguments, cloud-init off, installer netplan removed, SSH host keys regenerated on first boot, machine-id cleared, logs and history cleared, shutdown).
+
 ## v1.2 (2 Oct 2026)
 
 - Added `veeam/Restart-VeeamServices.ps1`: stop, start, restart or list all Veeam services in a safe order (database first, main service last on stop), closes any open console, `-WhatIf` support.
