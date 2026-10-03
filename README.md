@@ -20,6 +20,7 @@ All examples use placeholder names and addresses (`example.internal`, `192.0.2.x
 | [`truenas/`](truenas/) | `create-nfs-shares.sh` | Datasets and NFS shares for vSphere, vCenter backups and Veeam, bound to the storage IP. | [TrueNAS Part 5](https://rstechhub.com/truenas-scale-dell-r620-part-5-storage-vlan-dac-certificate/) |
 | [`mikrotik/`](mikrotik/) | `*.rsc` | RouterOS 7: read-only backup user, break-glass admin, clear logs. | [MikroTik config backups](https://rstechhub.com/nightly-mikrotik-config-backups-gitea/) |
 | [`linux/`](linux/) | `switch-backup.sh` | Nightly MikroTik `/export` over read-only SSH, committed to Git only when something changed. | [MikroTik config backups](https://rstechhub.com/nightly-mikrotik-config-backups-gitea/) |
+| [`linux/`](linux/) | `prepare-ubuntu-template.sh` | Seals an Ubuntu 24.04 VM before it becomes a vSphere template: new SSH host keys and machine-id per clone, cloud-init off for vCenter customization. | [Core Infrastructure Part 8](https://rstechhub.com/core-infrastructure-part-8-ubuntu-template/) |
 | [`linux/`](linux/) | `vault-backup.sh` | Nightly consistent backup of a Vaultwarden install to an NFS share, with retention. | |
 
 ## Requirements
