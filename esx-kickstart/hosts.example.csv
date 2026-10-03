@@ -1,0 +1,3 @@
+name,ip,idrac,nic,bootdisk
+esx01,192.0.2.21,esx01-idrac.example.internal,NIC.Integrated.1-1-1,
+esx02,192.0.2.22,esx02-idrac.example.internal,NIC.Integrated.1-1-1,
