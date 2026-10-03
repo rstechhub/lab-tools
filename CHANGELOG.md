@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.4 (3 Oct 2026)
+
+- Added `esx-kickstart/`: unattended ESX 9 installs on physical Dell servers from a Windows management PC. Pre-flight checks over Redfish, a kickstart ISO per host built on a Linux box, boot through iDRAC virtual media, parallel installs, VCF readiness checks over SSH and an HTML report. Passwords can come from Vaultwarden through the Bitwarden CLI.
+- ShellCheck now also covers `esx-kickstart/*.sh`.
+
 ## v1.3 (3 Oct 2026)
 
 - Added `linux/prepare-ubuntu-template.sh`: seals an Ubuntu 24.04 VM before converting it to a vSphere template (NTP servers as arguments, cloud-init off, installer netplan removed, SSH host keys regenerated on first boot, machine-id cleared, logs and history cleared, shutdown).
