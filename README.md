@@ -22,6 +22,7 @@ All examples use placeholder names and addresses (`example.internal`, `192.0.2.x
 | [`linux/`](linux/) | `switch-backup.sh` | Nightly MikroTik `/export` over read-only SSH, committed to Git only when something changed. | [MikroTik config backups](https://rstechhub.com/nightly-mikrotik-config-backups-gitea/) |
 | [`linux/`](linux/) | `prepare-ubuntu-template.sh` | Seals an Ubuntu 24.04 VM before it becomes a vSphere template: new SSH host keys and machine-id per clone, cloud-init off for vCenter customization. | [Core Infrastructure Part 8](https://rstechhub.com/core-infrastructure-part-8-ubuntu-template/) |
 | [`linux/`](linux/) | `vault-backup.sh` | Nightly consistent backup of a Vaultwarden install to an NFS share, with retention. | |
+| [`esx-kickstart/`](esx-kickstart/) | `Install-EsxKickstart.ps1` + helpers | Unattended ESX 9 installs on Dell servers: pre-flight checks, kickstart ISO per host, iDRAC virtual-media boot, parallel installs, VCF readiness checks, HTML report. | [Building a VCF 9 Lab, Part 2](https://rstechhub.com/vcf-9-lab-part-2-automated-esx-installs/) |
 
 ## Requirements
 
