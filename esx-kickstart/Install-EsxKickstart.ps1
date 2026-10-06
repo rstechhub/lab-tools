@@ -227,12 +227,16 @@ function Test-EsxReadiness($p) {
            "vmkping -I vmk0 -d -s $($mtu - 28) -c 2 $($cfg.Gateway) >/dev/null 2>&1 && echo JUMBO_OK || echo JUMBO_FAIL"
     $sshOpts = @('-i', $sshKey, '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new', '-o', 'ConnectTimeout=10')
     $checks = $null
-    for ($try = 1; $try -le 10; $try++) {
+    # separate budgets: up to 10 SSH attempts while the host finishes its last reboot, then up to
+    # 20 x 30 s for NTP to synchronise (ntpd needs several polls after a fresh boot)
+    $sshTry = 0; $ntpTry = 0
+    while ($true) {
         $out = (ssh @sshOpts "root@$($p.ip)" $cmd 2>$null) -join "`n"
         if ($LASTEXITCODE -ne 0 -or -not $out) {
             # the kickstart's first-boot section reboots the host once more: SSH can drop right after the
             # host first answers, so keep trying for a few minutes before calling it a failure
-            if ($try -lt 10) { Write-Host "$($p.name): SSH not ready yet (host may still be rebooting), retrying in 30 s ($try/10)"; Start-Sleep 30; continue }
+            $sshTry++
+            if ($sshTry -lt 10) { Write-Host "$($p.name): SSH not ready yet (host may still be rebooting), retrying in 30 s ($sshTry/10)"; Start-Sleep 30; continue }
             return @([pscustomobject]@{ Check = 'SSH login with key'; Expected = 'works'; Actual = "failed (is $sshKey.pub in /etc/ssh/keys-root/authorized_keys?)"; Pass = $false })
         }
         $s = $out -split '@@'
@@ -258,7 +262,9 @@ function Test-EsxReadiness($p) {
         )
         # NTP needs a few minutes to sync after the last reboot: wait for it, everything else is final
         if ($ntpSync) { break }
-        if ($try -lt 10) { Write-Host "$($p.name): waiting for NTP to synchronise ($try/10)"; Start-Sleep 30 }
+        $ntpTry++
+        if ($ntpTry -ge 20) { break }
+        Write-Host "$($p.name): waiting for NTP to synchronise ($ntpTry/20)"; Start-Sleep 30
     }
     return $checks
 }
