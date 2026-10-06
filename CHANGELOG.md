@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.5 (6 Oct 2026)
+
+- `esx-kickstart`: new `Mtu` setting sets vSwitch0 and vmk0 at first boot; two new readiness checks (vmk0 MTU, and a no-fragment ping of that size to the gateway).
+- `esx-kickstart`: the readiness checks retry SSH for up to 5 minutes, because the kickstart's first-boot section reboots the host once more after it first answers.
+- `esx-kickstart`: `-NoVault` switch to ignore the Vault items and ask for the passwords.
+- `esx-kickstart`: `Vlan` 0 leaves `--vlanid` out of the kickstart (untagged), for hosts behind an access port.
+
 ## v1.4 (3 Oct 2026)
 
 - Added `esx-kickstart/`: unattended ESX 9 installs on physical Dell servers from a Windows management PC. Pre-flight checks over Redfish, a kickstart ISO per host built on a Linux box, boot through iDRAC virtual media, parallel installs, VCF readiness checks over SSH and an HTML report. Passwords can come from Vaultwarden through the Bitwarden CLI.
