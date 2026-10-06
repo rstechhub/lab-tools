@@ -27,13 +27,14 @@ waits for the install to finish, checks the host is ready for VCF and writes an 
 5. **Waits** until each host answers with a certificate issued to its FQDN and SSH is up.
 6. **Checks VCF readiness** over SSH with a dedicated key, `~/.ssh/esx_kickstart_ecdsa`, created on first
    use and added for root by the kickstart: build, vmk0 IP,
-   management VLAN, DNS search domain, NTP servers and sync, IPv6 off, certificate SAN, and every disk
-   except the boot disk empty and eligible for vSAN (`vdq -q`).
+   management VLAN, DNS search domain, NTP servers and sync, IPv6 off, certificate SAN, vmk0 MTU and a
+   no-fragment ping of that size to the gateway, and every disk except the boot disk empty and eligible
+   for vSAN (`vdq -q`).
 7. **Cleans up and reports:** ejects the media, deletes the ISOs (they contain the root password) and
    writes `reports\esx-install-<date>.html` with the results, the checks and iDRAC console screenshots,
    plus a transcript log.
 
-`-DryRun` stops after step 3. `-Force` installs every host in the file without questions.
+`-DryRun` stops after step 3. `-Force` installs every host in the file without questions. `-NoVault` ignores the Vault items and asks for the passwords.
 
 ## Requirements
 
@@ -64,6 +65,10 @@ names (each can be one item for all hosts, or a pattern such as `iDRAC {name}` /
 Vaultwarden notes: the Bitwarden CLI ignores the Windows certificate store, so for a private CA export the
 root CA to PEM and set `NODE_EXTRA_CA_CERTS` to it. CLI 2026.9.x can't log in to Vaultwarden 1.37.x
 (`KeyIdBackfillError`, vaultwarden issue #7750); use CLI 2026.8.0 and don't run `bw update` until it's fixed.
+
+`Mtu` in the settings (default 1500) sets vSwitch0 and vmk0 at first boot. With 9000, the readiness checks
+prove jumbo frames reach the gateway before the VCF bring-up, which builds its own switch with the MTU you
+give the wizard.
 
 ## Gotchas found on the way
 
