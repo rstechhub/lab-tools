@@ -5,7 +5,7 @@
 #   hosts.csv    columns: name,ip,mac,bootdisk   (header line required; mac = management uplink)
 #   settings.env shell assignments written by Install-EsxKickstart.ps1 from esx-settings.json:
 #                KS_DOMAIN KS_NETMASK KS_GATEWAY KS_DNS (comma list) KS_NTP (comma list) KS_VLAN
-#                KS_KEYBOARD KS_BOOTDISK (default model) KS_SSHKEY (public key, may be empty)
+#                (KS_VLAN 0 = untagged) KS_KEYBOARD KS_BOOTDISK (default model) KS_SSHKEY (public key, may be empty) KS_MTU (default 1500)
 # Reads the root passwords on stdin, one "<name><TAB><password>" line per host (never written anywhere but into the ISOs).
 # Needs: xorriso.
 set -euo pipefail
@@ -16,7 +16,7 @@ source "$SETTINGS"
 for v in KS_DOMAIN KS_NETMASK KS_GATEWAY KS_DNS KS_NTP KS_VLAN KS_KEYBOARD; do
   [[ -n "${!v:-}" ]] || { echo "$v is missing from $SETTINGS"; exit 1; }
 done
-KS_BOOTDISK=${KS_BOOTDISK:-}; KS_SSHKEY=${KS_SSHKEY:-}
+KS_BOOTDISK=${KS_BOOTDISK:-}; KS_SSHKEY=${KS_SSHKEY:-}; KS_MTU=${KS_MTU:-1500}
 
 command -v xorriso >/dev/null || { echo "xorriso not found (apt install xorriso)"; exit 1; }
 # root passwords on stdin, one line per host: <name><TAB><password> (CR at line ends is stripped)
@@ -30,6 +30,8 @@ done
 esc() { printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'; }
 NTPARGS=""; IFS=, read -ra NTPS <<< "$KS_NTP"
 for n in "${NTPS[@]}"; do NTPARGS+="--server=$n "; done
+# VLAN 0 = untagged (the port group in front of the host tags it): leave --vlanid out of the kickstart
+VLANOPT=" --vlanid=$KS_VLAN"; [[ "$KS_VLAN" == "0" ]] && VLANOPT=""
 if [[ -n "$KS_SSHKEY" ]]; then
   SSHKEYCMD="mkdir -p /etc/ssh/keys-root; echo '$KS_SSHKEY' >> /etc/ssh/keys-root/authorized_keys; chmod 600 /etc/ssh/keys-root/authorized_keys"
 else
@@ -56,7 +58,7 @@ tail -n +2 "$HOSTS" | while IFS=, read -r NAME IP MAC DISK; do
   sed -e "s|{{BOOTDISK}}|$(esc "$KSDISK")|g" -e "s|{{ROOTPW}}|$(esc "$ROOTPW")|g" \
       -e "s|{{KEYBOARD}}|$(esc "$KS_KEYBOARD")|g" -e "s|{{MAC}}|$MAC|g" -e "s|{{IP}}|$IP|g" \
       -e "s|{{NETMASK}}|$KS_NETMASK|g" -e "s|{{GATEWAY}}|$KS_GATEWAY|g" -e "s|{{DNS}}|$KS_DNS|g" \
-      -e "s|{{FQDN}}|$FQDN|g" -e "s|{{VLAN}}|$KS_VLAN|g" -e "s|{{DOMAIN}}|$KS_DOMAIN|g" \
+      -e "s| --vlanid={{VLAN}}|$VLANOPT|g" -e "s|{{MTU}}|$KS_MTU|g" -e "s|{{FQDN}}|$FQDN|g" -e "s|{{VLAN}}|$KS_VLAN|g" -e "s|{{DOMAIN}}|$KS_DOMAIN|g" \
       -e "s|{{NTPARGS}}|$(esc "$NTPARGS")|g" -e "s|{{SSHKEYCMD}}|$(esc "$SSHKEYCMD")|g" \
       "$TEMPLATE" | tr -d '\r' > "$B/KS.CFG"
 
