@@ -45,6 +45,9 @@
 .PARAMETER DryRun
     Run the pre-flight checks, build and serve the ISOs, then stop. Nothing is mounted or rebooted.
 
+.PARAMETER NoVault
+    Ignore the Vault items in the settings and ask for every password instead.
+
 .PARAMETER NoScreenshots
     Don't capture iDRAC console screenshots for the report.
 
@@ -72,6 +75,7 @@ param(
     [switch]$Force,
     [switch]$DryRun,
     [switch]$NoScreenshots,
+    [switch]$NoVault,
     [string]$ReportFolder  = (Join-Path $PSScriptRoot 'reports')
 )
 $ErrorActionPreference = 'Stop'
@@ -97,6 +101,7 @@ $runError = $null
 $allHosts = @()
 $isoCheck = 'not checked'
 $sshKey   = Join-Path $HOME '.ssh/esx_kickstart_ecdsa'
+$mtu = if ($cfg.Mtu) { [int]$cfg.Mtu } else { 1500 }
 
 New-Item -ItemType Directory -Path $ReportFolder -Force | Out-Null
 $shotDir = Join-Path $ReportFolder "esx-install-$stamp"
@@ -159,7 +164,7 @@ function Get-EsxInfo([string]$Name) {
 
 function Get-VaultLogin([string]$Item) {
     # Vaultwarden through the Bitwarden CLI: needs 'bw' on the PATH and an unlocked session (BW_SESSION)
-    if (-not $Item) { return $null }
+    if ($NoVault -or -not $Item) { return $null }
     if (-not (Get-Command bw -ErrorAction SilentlyContinue)) { Write-Warning "Vault item '$Item' set but the Bitwarden CLI (bw) is not installed - asking instead"; return $null }
     if (-not $env:BW_SESSION) { Write-Warning "Vault item '$Item' set but the vault is locked (run: `$env:BW_SESSION = bw unlock --raw) - asking instead"; return $null }
     try { $i = bw get item $Item 2>$null | ConvertFrom-Json; return $i.login }
@@ -217,12 +222,17 @@ function Test-EsxReadiness($p) {
     # read-only checks over SSH with the key the kickstart added for root
     $cmd = 'vmware -v; echo @@; esxcli network ip interface ipv4 get -i vmk0; echo @@; esxcli network vswitch standard portgroup list; ' +
            'echo @@; esxcli network ip dns search list; echo @@; esxcli system ntp get; echo @@; esxcli network ip get; ' +
-           'echo @@; openssl x509 -in /etc/vmware/ssl/rui.crt -noout -ext subjectAltName; echo @@; vdq -q'
+           'echo @@; openssl x509 -in /etc/vmware/ssl/rui.crt -noout -ext subjectAltName; echo @@; vdq -q; ' +
+           "echo @@; esxcli network ip interface list | grep -A12 '^vmk0' | grep -m1 'MTU:'; echo @@; " +
+           "vmkping -I vmk0 -d -s $($mtu - 28) -c 2 $($cfg.Gateway) >/dev/null 2>&1 && echo JUMBO_OK || echo JUMBO_FAIL"
     $sshOpts = @('-i', $sshKey, '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new', '-o', 'ConnectTimeout=10')
     $checks = $null
     for ($try = 1; $try -le 10; $try++) {
         $out = (ssh @sshOpts "root@$($p.ip)" $cmd 2>$null) -join "`n"
         if ($LASTEXITCODE -ne 0 -or -not $out) {
+            # the kickstart's first-boot section reboots the host once more: SSH can drop right after the
+            # host first answers, so keep trying for a few minutes before calling it a failure
+            if ($try -lt 10) { Write-Host "$($p.name): SSH not ready yet (host may still be rebooting), retrying in 30 s ($try/10)"; Start-Sleep 30; continue }
             return @([pscustomobject]@{ Check = 'SSH login with key'; Expected = 'works'; Actual = "failed (is $sshKey.pub in /etc/ssh/keys-root/authorized_keys?)"; Pass = $false })
         }
         $s = $out -split '@@'
@@ -243,6 +253,8 @@ function Test-EsxReadiness($p) {
             [pscustomobject]@{ Check = 'IPv6';             Expected = 'disabled';      Actual = $(if ($s[5] -match 'IPv6Enabled:\s*false') { 'disabled' } else { 'enabled' }); Pass = $s[5] -match 'IPv6Enabled:\s*false' }
             [pscustomobject]@{ Check = 'Disks eligible for vSAN'; Expected = "all but the boot disk ($diskTotal disks seen)"; Actual = "$diskOk of $([math]::Max($diskTotal - 1, 0))"; Pass = $diskTotal -gt 1 -and $diskOk -eq $diskTotal - 1 }
             [pscustomobject]@{ Check = 'Certificate SAN';  Expected = "DNS:$($p.fqdn)"; Actual = ($s[6] -replace '(?s).*Alternative Name:\s*', '').Trim(); Pass = $s[6] -match [regex]::Escape("DNS:$($p.fqdn)") }
+            [pscustomobject]@{ Check = 'vmk0 MTU';         Expected = "$mtu"; Actual = $(if ($s[8] -match 'MTU:\s*(\d+)') { $Matches[1] } else { '?' }); Pass = $s[8] -match "MTU:\s*$mtu\b" }
+            [pscustomobject]@{ Check = "Frames of $mtu to the gateway"; Expected = 'no fragmentation'; Actual = $(if ($s[9] -match 'JUMBO_OK') { 'reply' } else { 'no reply (check switch and gateway MTU)' }); Pass = $s[9] -match 'JUMBO_OK' }
         )
         # NTP needs a few minutes to sync after the last reboot: wait for it, everything else is final
         if ($ntpSync) { break }
@@ -463,7 +475,7 @@ try {
     $envLines = @(
         "KS_DOMAIN=$(& $q $Domain)", "KS_NETMASK=$(& $q $cfg.Netmask)", "KS_GATEWAY=$(& $q $cfg.Gateway)",
         "KS_DNS=$(& $q ($cfg.Dns -join ','))", "KS_NTP=$(& $q ($cfg.Ntp -join ','))", "KS_VLAN=$(& $q $cfg.Vlan)",
-        "KS_KEYBOARD=$(& $q $cfg.Keyboard)", "KS_BOOTDISK=$(& $q $cfg.DefaultBootDisk)", "KS_SSHKEY=$(& $q $pubKey)")
+        "KS_KEYBOARD=$(& $q $cfg.Keyboard)", "KS_BOOTDISK=$(& $q $cfg.DefaultBootDisk)", "KS_SSHKEY=$(& $q $pubKey)", "KS_MTU=$(& $q $mtu)")
     [System.IO.File]::WriteAllText($envFile, ($envLines -join "`n") + "`n")
     $csvTmp = Join-Path $env:TEMP 'ks-hosts.csv'
     $lines = @('name,ip,mac,bootdisk') + ($plan | ForEach-Object { "$($_.name),$($_.ip),$($_.mac),$($_.bootdisk)" })
