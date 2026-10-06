@@ -223,7 +223,7 @@ function Test-EsxReadiness($p) {
     $cmd = 'vmware -v; echo @@; esxcli network ip interface ipv4 get -i vmk0; echo @@; esxcli network vswitch standard portgroup list; ' +
            'echo @@; esxcli network ip dns search list; echo @@; esxcli system ntp get; echo @@; esxcli network ip get; ' +
            'echo @@; openssl x509 -in /etc/vmware/ssl/rui.crt -noout -ext subjectAltName; echo @@; vdq -q; ' +
-           "echo @@; esxcli network ip interface list | grep -A12 '^vmk0' | grep -m1 'MTU:'; echo @@; " +
+           "echo @@; esxcli network ip interface list | grep -A30 '^vmk0' | grep -m1 'MTU:'; echo @@; " +
            "vmkping -I vmk0 -d -s $($mtu - 28) -c 2 $($cfg.Gateway) >/dev/null 2>&1 && echo JUMBO_OK || echo JUMBO_FAIL"
     $sshOpts = @('-i', $sshKey, '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new', '-o', 'ConnectTimeout=10')
     $checks = $null
