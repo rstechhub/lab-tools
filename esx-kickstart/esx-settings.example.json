@@ -2,9 +2,16 @@
   "Domain": "vcf.example.internal",
   "Netmask": "255.255.255.0",
   "Gateway": "192.0.2.1",
-  "Dns": ["192.0.2.10", "192.0.2.11"],
-  "Ntp": ["192.0.2.10", "192.0.2.11"],
+  "Dns": [
+    "192.0.2.10",
+    "192.0.2.11"
+  ],
+  "Ntp": [
+    "192.0.2.10",
+    "192.0.2.11"
+  ],
   "Vlan": 100,
+  "Mtu": 9000,
   "Keyboard": "US Default",
   "DefaultBootDisk": "",
   "BuildHost": "buildbox.example.internal",
@@ -13,6 +20,9 @@
   "StockIso": "C:\\ISO\\VMware-VMvisor-Installer-9.0.2.0100.25595025.x86_64.iso",
   "StockIsoSha256": "",
   "AddRootSshKey": true,
-  "Vault": { "IdracItem": "", "RootPasswordItem": "" },
+  "Vault": {
+    "IdracItem": "",
+    "RootPasswordItem": ""
+  },
   "_VaultHelp": "IdracItem and RootPasswordItem: one item name for every host, or a pattern with {name}, e.g. \"iDRAC {name}\" or \"ESXi root {name}\". Empty = ask."
 }
