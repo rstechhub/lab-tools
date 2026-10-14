@@ -17,10 +17,13 @@ waits for the install to finish, checks the host is ready for VCF and writes an 
 
 1. **Pre-flight:** DNS A and PTR for every host, the stock ISO's SHA-256, and over Redfish the BIOS
    boot mode (must be UEFI), power state, link on the management port and iDRAC virtual media.
+   With `nic` empty or `auto` in the hosts file, the script picks the fastest port that has link
+   (and falls back to it if the named port has none).
    A host that fails is blocked and listed in the report; the others carry on.
 2. **Asks per host** what to do, showing what it runs now. A reinstall wipes every local disk
    (`clearpart --alldrives`), so you type the host name to confirm. Then you pick the boot disk from
-   the iDRAC's list (or set it in the hosts file).
+   the iDRAC's list, `B` for a boot card the iDRAC can't see (`BootCardModel` in the settings, the default
+   when set) or `U` for USB/SD, or set it in the hosts file.
 3. **Builds the ISOs** on the build box and checks nginx answers HTTP Range requests (206).
    iDRAC virtual media reads the ISO in pieces; a server without Range support makes the UEFI boot fail.
 4. **Boots each server** from its ISO (virtual media, one-time boot override, restart).
@@ -83,3 +86,9 @@ give the wizard.
   The script uses an ECDSA P-384 key for the hosts.
 - The installer warns that it can't get a DHCP address before it reads the kickstart. Harmless: the
   static address is applied from the kickstart.
+- Add-in NICs report the link on the partition (`NIC.Slot.4-1-1`) but the MAC on the port (`NIC.Slot.4-1`).
+  The script takes the MAC from the parent port, otherwise the kickstart gets no uplink.
+- Third-party boot cards (HPE NS204i-p in a Dell R740xd) don't show up in the iDRAC's Redfish storage list.
+  Target them by the model ESX reports (`esxcli storage core device list`). The driver name (`nvme_pcie`)
+  isn't safe when the server also has an NVMe data drive.
+- Works for ESXi 8.0 U3 too (tested on two R740xds with Dell's A11 image), not just ESX 9.
