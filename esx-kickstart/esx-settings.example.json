@@ -24,5 +24,6 @@
     "IdracItem": "",
     "RootPasswordItem": ""
   },
-  "_VaultHelp": "IdracItem and RootPasswordItem: one item name for every host, or a pattern with {name}, e.g. \"iDRAC {name}\" or \"ESXi root {name}\". Empty = ask."
+  "_VaultHelp": "IdracItem and RootPasswordItem: one item name for every host, or a pattern with {name}, e.g. \"iDRAC {name}\" or \"ESXi root {name}\". Empty = ask.",
+  "BootCardModel": ""
 }
