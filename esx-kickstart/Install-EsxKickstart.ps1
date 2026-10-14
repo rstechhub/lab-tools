@@ -27,9 +27,13 @@
     EVERY host you want checked or installed must have a row in it: the script never touches a host
     that is not listed. Physical Dell servers with an iDRAC only; nested ESX hosts need another method.
     Columns: name,ip,idrac,nic[,bootdisk]
-      nic      = iDRAC FQDD of the management port, e.g. NIC.Integrated.1-1-1 or NIC.Slot.2-1-1
-      bootdisk = optional disk model to install ESX on, as the iDRAC reports it. Empty: the script lists
-                 the server's disks and asks (with -Force it uses DefaultBootDisk from the settings).
+      nic      = iDRAC FQDD of the management port, e.g. NIC.Integrated.1-1-1 or NIC.Slot.2-1-1.
+                 Empty or 'auto': the script picks the fastest port with link. If the named port has no
+                 link, it falls back to that too and says so in the report.
+      bootdisk = optional disk model to install ESX on, as ESX reports it, or usb. Empty: the script lists the
+                 iDRAC's disks plus B = BootCardModel from the settings (a boot card the iDRAC cannot see,
+                 e.g. 'HPE NS204i-p Gen10+ Boot Controller', the default) and U = USB/SD, and asks.
+                 With -Force it uses DefaultBootDisk.
 
 .PARAMETER Settings
     JSON file with the network values (domain, netmask, gateway, DNS, NTP, VLAN), the build box, the ISO
@@ -94,7 +98,8 @@ $Domain   = $cfg.Domain
 $HttpPort = [int]$cfg.HttpPort
 $remote   = "$BuildUser@$BuildHost"
 $isoName  = Split-Path $StockIso -Leaf
-$isoBuild = if ($isoName -match '\.(\d{7,9})\.x86_64\.iso$') { $Matches[1] } else { $null }
+# Stock: ...-9.0.2.0100.25595025.x86_64.iso   Dell: ...-8.0.0.update03-25429389.x86_64-Dell_Customized-A11.iso
+$isoBuild = if ($isoName -match '[.-](\d{7,9})\.x86_64[^\\/]*\.iso$') { $Matches[1] } else { $null }
 $runStart = Get-Date
 $stamp    = '{0:yyyyMMdd-HHmm}' -f $runStart
 $runError = $null
@@ -171,6 +176,23 @@ function Get-VaultLogin([string]$Item) {
     catch { Write-Warning "Could not read '$Item' from the vault - asking instead"; return $null }
 }
 
+function Get-RedfishNics([string]$Idrac) {
+    $list = (Invoke-Redfish $Idrac '/redfish/v1/Systems/System.Embedded.1/EthernetInterfaces').Members
+    $all = @(foreach ($m in $list) {
+        $n = Invoke-Redfish $Idrac $m.'@odata.id'
+        [pscustomobject]@{ Id = $n.Id; Link = $n.LinkStatus; Mbps = [int]$n.SpeedMbps; Mac = $n.MACAddress }
+    })
+    # Add-in cards (NIC.Slot.x-y-1) report the link on the partition but the MAC on the port (NIC.Slot.x-y)
+    foreach ($x in $all) {
+        if (-not $x.Mac) {
+            $parent = $x.Id -replace '-\d+$', ''
+            $pm = ($all | Where-Object Id -eq $parent | Select-Object -First 1).Mac
+            if ($pm) { $x.Mac = $pm }
+        }
+    }
+    $all
+}
+
 function Get-RedfishDrives([string]$Idrac) {
     $ctrls = (Invoke-Redfish $Idrac '/redfish/v1/Systems/System.Embedded.1/Storage').Members
     foreach ($c in $ctrls) {
@@ -185,14 +207,24 @@ function Get-RedfishDrives([string]$Idrac) {
 
 function Select-BootDisk($p) {
     $drives = @(Get-RedfishDrives $p.idrac | Sort-Object Protocol, Model)
-    if (-not $drives) { throw "$($p.name): the iDRAC reports no drives" }
     Write-Host "`n$($p.name): disks found by the iDRAC" -ForegroundColor Cyan
     $i = 0
-    $drives | ForEach-Object { $i++; [pscustomobject]@{ '#' = $i; Model = $_.Model; 'Size GB' = $_.SizeGB
-                                Media = $_.Media; Protocol = $_.Protocol; Controller = $_.Controller } } |
-        Format-Table -AutoSize | Out-Host
-    do { $n = Read-Host "$($p.name): install ESX on which disk? [1-$($drives.Count)]" }
-    until ($n -match '^\d+$' -and [int]$n -ge 1 -and [int]$n -le $drives.Count)
+    if ($drives) {
+        $drives | ForEach-Object { $i++; [pscustomobject]@{ '#' = $i; Model = $_.Model; 'Size GB' = $_.SizeGB
+                                    Media = $_.Media; Protocol = $_.Protocol; Controller = $_.Controller } } |
+            Format-Table -AutoSize | Out-Host
+    } else { Write-Host '  (none)' }
+    # Boot devices the iDRAC cannot see: a third-party boot card (e.g. HPE NS204i-p) and USB/SD
+    $card = "$($cfg.BootCardModel)".Trim()
+    if ($card) { Write-Host "  B = boot card: $card  (default, press Enter)" -ForegroundColor Green }
+    Write-Host '  U = USB stick or SD card (first USB device)'
+    $choices = @(); if ($drives) { $choices += "1-$($drives.Count)" }; if ($card) { $choices += 'B' }; $choices += 'U'
+    do {
+        $n = (Read-Host "$($p.name): install ESX on which disk? [$($choices -join ', ')]").Trim()
+        if (-not $n -and $card) { $n = 'B' }
+    } until (($n -match '^[Bb]$' -and $card) -or $n -match '^[Uu]$' -or ($n -match '^\d+$' -and [int]$n -ge 1 -and [int]$n -le $drives.Count))
+    if ($n -match '^[Bb]$') { Write-Host "$($p.name): ESX goes on '$card'." -ForegroundColor Green; return $card }
+    if ($n -match '^[Uu]$') { Write-Host "$($p.name): ESX goes on the first USB/SD device (usb)." -ForegroundColor Green; return 'usb' }
     $model = $drives[[int]$n - 1].Model
     $same  = @($drives | Where-Object Model -eq $model).Count
     if ($same -gt 1) { Write-Warning "$($p.name): $same disks are model '$model'. ESX installs on the first of them it finds." }
@@ -343,7 +375,8 @@ try {
     Write-Host 'Physical servers only. Only the hosts listed in this file are checked or installed: add a row for every host you want to build.' -ForegroundColor Yellow
     if (-not $hosts) { throw "$HostsCsv has no host rows" }
     foreach ($h in $hosts) {
-        if (-not $h.idrac -or -not $h.nic) { throw "$($h.name): the idrac and nic columns must be filled in (this script is for physical servers with an iDRAC)" }
+        if (-not $h.idrac) { throw "$($h.name): the idrac column must be filled in (this script is for physical servers with an iDRAC)" }
+        if (-not $h.nic) { $h.nic = 'auto' }
     }
     $hosts | Format-Table name, ip, idrac, nic -AutoSize | Out-Host
 
@@ -394,14 +427,24 @@ try {
     Write-Host "`nPre-flight checks (Redfish)..." -ForegroundColor Cyan
     foreach ($p in $plan) {
         try {
-            $nic = Invoke-Redfish $p.idrac "/redfish/v1/Systems/System.Embedded.1/EthernetInterfaces/$($p.nic)"
-            $p.mac = $nic.MACAddress.ToLower()
+            $nics = @(Get-RedfishNics $p.idrac)
+            $nic  = $nics | Where-Object Id -eq $p.nic | Select-Object -First 1
+            if (-not $nic -or $nic.Link -ne 'LinkUp') {
+                $pick = $nics | Where-Object Link -eq 'LinkUp' | Sort-Object @{e='Mbps';Descending=$true}, Id | Select-Object -First 1
+                if ($pick) {
+                    if ($p.nic -ne 'auto') { Write-Host "$($p.name): $($p.nic) has no link, using $($pick.Id) ($($pick.Mbps) Mbps) instead" -ForegroundColor Yellow }
+                    else { Write-Host "$($p.name): management port detected: $($pick.Id) ($($pick.Mbps) Mbps)" -ForegroundColor Yellow }
+                    $p.nic = $pick.Id; $nic = $pick
+                } elseif (-not $nic) { $nic = [pscustomobject]@{ Id = $p.nic; Link = 'NoPortWithLink'; Mac = '' } }
+            }
+            $p.mac = "$($nic.Mac)".ToLower()
             $sys  = Invoke-Redfish $p.idrac '/redfish/v1/Systems/System.Embedded.1'
             $mode = (Invoke-Redfish $p.idrac '/redfish/v1/Systems/System.Embedded.1/Bios').Attributes.BootMode
             $p.cd = Get-VirtualCdPath $p.idrac
-            $p.preflight = @("$($sys.Model)", "power $($sys.PowerState)", "boot mode $mode", "link $($nic.LinkStatus)", $(if ($p.cd) { 'virtual media OK' } else { 'no virtual media' }))
+            $p.preflight = @("$($sys.Model)", "power $($sys.PowerState)", "boot mode $mode", "port $($p.nic) link $($nic.Link)", $(if ($p.cd) { 'virtual media OK' } else { 'no virtual media' }))
             if ($mode -ne 'Uefi')            { $p.blocked = $true; $p.result = 'Blocked: BIOS not in UEFI mode' }
-            elseif ($nic.LinkStatus -ne 'LinkUp') { $p.blocked = $true; $p.result = "Blocked: $($p.nic) has no link" }
+            elseif ($nic.Link -ne 'LinkUp') { $p.blocked = $true; $p.result = "Blocked: no network port with link ($($p.nic))" }
+            elseif (-not $p.mac)             { $p.blocked = $true; $p.result = "Blocked: no MAC address found for $($p.nic)" }
             elseif (-not $p.cd)              { $p.blocked = $true; $p.result = 'Blocked: no iDRAC virtual media' }
         } catch { $p.blocked = $true; $p.result = "Blocked: iDRAC query failed"; $p.preflight = @($_.Exception.Message) }
         $col = if ($p.blocked) { 'Red' } else { 'Green' }
