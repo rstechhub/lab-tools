@@ -580,7 +580,8 @@ try {
             if (-not $p.wentDown) { continue }
             # SSH is switched on by the kickstart's first-boot section, so port 22 means it has run
             $t = [System.Net.Sockets.TcpClient]::new()
-            $sshUp = $t.ConnectAsync($p.ip, 22).Wait(3000); $t.Dispose()
+            # a refused connection (port still closed while the host boots) throws: treat it as not up yet
+            $sshUp = try { $t.ConnectAsync($p.ip, 22).Wait(3000) } catch { $false } finally { $t.Dispose() }
             if (-not ($sshUp -and $subj -match [regex]::Escape($p.fqdn))) { continue }
 
             $p.minutes = [math]::Round(((Get-Date) - $p.started).TotalMinutes, 1)
