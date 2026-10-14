@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.6 (14 Oct 2026)
+
+- `esx-kickstart`: management port detection. With `nic` empty or `auto` in the hosts file the script picks the fastest port that has link, and falls back to it when the named port has none.
+- `esx-kickstart`: add-in NICs report the link on the partition (`NIC.Slot.4-1-1`) but the MAC on the port (`NIC.Slot.4-1`); the MAC now comes from the parent port, so the kickstart gets its uplink.
+- `esx-kickstart`: boot card option. `BootCardModel` in the settings names a boot device the iDRAC can't list (HPE NS204i-p in a Dell R740xd); the disk prompt offers it as `B` (default) and USB/SD as `U`.
+- `esx-kickstart`: the ESX build number is read from Dell-customised ISO names too. Tested with ESXi 8.0 U3 (Dell A11) on two R740xds.
+
 ## v1.5 (6 Oct 2026)
 
 - `esx-kickstart`: new `Mtu` setting sets vSwitch0 and vmk0 at first boot; two new readiness checks (vmk0 MTU, and a no-fragment ping of that size to the gateway).
