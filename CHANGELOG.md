@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.6.1 (14 Oct 2026)
+
+- `esx-kickstart`: the wait for SSH no longer stops the run when a host refuses the connection while it reboots after the install.
+
 ## v1.6 (14 Oct 2026)
 
 - `esx-kickstart`: management port detection. With `nic` empty or `auto` in the hosts file the script picks the fastest port that has link, and falls back to it when the named port has none.
