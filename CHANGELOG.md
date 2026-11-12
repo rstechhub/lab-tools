@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.7 (12 Nov 2026)
+
+- Added `windows/Get-VcfSsoGroupMembers.ps1` and `windows/New-VcfReadOnlyTestUser.ps1`: find the OU for the VCF SSO user step and create a read-only test user.
+
 ## v1.6.1 (14 Oct 2026)
 
 - `esx-kickstart`: the wait for SSH no longer stops the run when a host refuses the connection while it reboots after the install.
